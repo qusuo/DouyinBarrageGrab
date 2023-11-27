@@ -1,21 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
-using System.Net.WebSockets;
 using System.Text;
-using System.Threading.Tasks;
 using System.Timers;
 using ColorConsole;
 using Fleck;
 using Newtonsoft.Json;
-using BarrageGrab.Modles;
-using Newtonsoft.Json.Linq;
-using System.Net.Http;
-using System.IO.Compression;
-using System.IO;
 using BarrageGrab.Modles.JsonEntity;
 using BarrageGrab.Modles.ProtoEntity;
+using System.Net.Sockets;
 
 namespace BarrageGrab
 {
@@ -34,7 +27,6 @@ namespace BarrageGrab
         ConsoleWriter console = new ConsoleWriter();
         WssBarrageGrab grab = new WssBarrageGrab();
         Appsetting Appsetting = Appsetting.Current;
-        bool debug = false;        
 
         /// <summary>
         /// 服务关闭后触发
@@ -43,9 +35,8 @@ namespace BarrageGrab
 
         public WsBarrageService()
         {
-#if DEBUG
-            debug = true;
-#endif
+            console.WriteLine($"当前版本：WsBarrageService", ConsoleColor.Green);
+
             var socket = new WebSocketServer($"ws://0.0.0.0:{Appsetting.WsProt}");
             socket.RestartAfterListenError = true;//异常重启
 
@@ -63,12 +54,14 @@ namespace BarrageGrab
             this.grab.OnControlMessage += Grab_OnControlMessage;
 
             this.socketServer = socket;
-            //dieout.Start();
+            dieout.Start();
             giftCountTimer.Start();
         }
 
         private void GiftCountTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
+            console.WriteLine($"礼物计数缓存清理", ConsoleColor.Green);
+
             var now = DateTime.Now;
             var timeOutKeys = giftCountCache.Where(w => w.Value.Item2 < now.AddSeconds(-10) || w.Value == null).Select(s => s.Key).ToList();
 
@@ -81,10 +74,14 @@ namespace BarrageGrab
 
                 });
             }
+
+            console.WriteLine($"礼物计数缓存清理 end", ConsoleColor.Green);
         }
 
         private bool CheckRoomId(long roomid)
         {
+            console.WriteLine($"检查房间号：{roomid}", ConsoleColor.Green);
+
             if (Appsetting.RoomIds.Length == 0) return true;
             return Appsetting.RoomIds.Any(a => a == roomid);
         }
@@ -92,6 +89,8 @@ namespace BarrageGrab
         //解析用户
         private MsgUser GetUser(User data)
         {
+            console.WriteLine($"解析用户：{data.Id} {data.Nickname}", ConsoleColor.Green);
+
             MsgUser user = new MsgUser()
             {
                 DisplayId = data.displayId,
@@ -125,6 +124,8 @@ namespace BarrageGrab
         static int count = 0;
         private void PrintMsg(Msg msg, PackMsgType barType)
         {
+            console.WriteLine($"{DateTime.Now.ToString("HH:mm:ss")} [{barType}]", ConsoleColor.White);
+
             if (!Appsetting.PrintBarrage) return;
             if (Appsetting.Current.PrintFilter.Any() && !Appsetting.Current.PrintFilter.Contains(barType.GetHashCode())) return;
 
@@ -166,6 +167,7 @@ namespace BarrageGrab
         //粉丝团
         private void Grab_OnFansclubMessage(object sender, WssBarrageGrab.RoomMessageEventArgs<FansclubMessage> e)
         {
+            console.WriteLine($"粉丝团消息：{e.Message.Common.roomId} {e.Message.Content}", ConsoleColor.Blue);
             var msg = e.Message;
             if (!CheckRoomId(msg.Common.roomId)) return;
             var enty = new FansclubMsg()
@@ -187,6 +189,7 @@ namespace BarrageGrab
         //统计消息
         private void Grab_OnRoomUserSeqMessage(object sender, WssBarrageGrab.RoomMessageEventArgs<RoomUserSeqMessage> e)
         {
+            console.WriteLine($"统计消息：{e.Message.Common.roomId} {e.Message.Total} {e.Message.totalUser}", ConsoleColor.Magenta);
             var msg = e.Message;
             if (!CheckRoomId(msg.Common.roomId)) return;
             var enty = new UserSeqMsg()
@@ -211,6 +214,7 @@ namespace BarrageGrab
         //礼物
         private void Grab_OnGiftMessage(object sender, WssBarrageGrab.RoomMessageEventArgs<GiftMessage> e)
         {
+            console.WriteLine($"礼物消息：{e.Message.Common.roomId} {e.Message.giftId} {e.Message.repeatCount}", ConsoleColor.Red);
             var msg = e.Message;
             if (!CheckRoomId(msg.Common.roomId)) return;
 
@@ -287,6 +291,8 @@ namespace BarrageGrab
         //关注
         private void Grab_OnSocialMessage(object sender, WssBarrageGrab.RoomMessageEventArgs<SocialMessage> e)
         {
+            console.WriteLine($"关注消息：{e.Message.Common.roomId} {e.Message.Action}", ConsoleColor.Yellow);
+
             var msg = e.Message;
             if (!CheckRoomId(msg.Common.roomId)) return;
             if (msg.Action != 1) return;
@@ -309,6 +315,8 @@ namespace BarrageGrab
         //直播间分享
         private void Grab_OnShardMessage(object sender, WssBarrageGrab.RoomMessageEventArgs<SocialMessage> e)
         {
+            console.WriteLine($"分享消息：{e.Message.Common.roomId} {e.Message.shareTarget}", ConsoleColor.DarkBlue);
+
             var msg = e.Message;
             if (!CheckRoomId(msg.Common.roomId)) return;
             if (msg.Action != 3) return;
@@ -340,6 +348,8 @@ namespace BarrageGrab
         //来了
         private void Grab_OnMemberMessage(object sender, WssBarrageGrab.RoomMessageEventArgs<Modles.ProtoEntity.MemberMessage> e)
         {
+            console.WriteLine($"进入直播间：{e.Message.Common.roomId} {e.Message.memberCount}", ConsoleColor.Green);
+
             var msg = e.Message;
             if (!CheckRoomId(msg.Common.roomId)) return;
 
@@ -363,6 +373,8 @@ namespace BarrageGrab
         //点赞
         private void Grab_OnLikeMessage(object sender, WssBarrageGrab.RoomMessageEventArgs<LikeMessage> e)
         {
+            console.WriteLine($"点赞消息：{e.Message.Common.roomId} {e.Message.Count}", ConsoleColor.Cyan);
+
             var msg = e.Message;
             if (!CheckRoomId(msg.Common.roomId)) return;
 
@@ -386,6 +398,8 @@ namespace BarrageGrab
         //弹幕
         private void Grab_OnChatMessage(object sender, WssBarrageGrab.RoomMessageEventArgs<ChatMessage> e)
         {
+            console.WriteLine($"弹幕消息：{e.Message.Common.roomId} {e.Message.Content}", ConsoleColor.White);
+
             var msg = e.Message;
             if (!CheckRoomId(msg.Common.roomId)) return;
 
@@ -408,6 +422,7 @@ namespace BarrageGrab
         //直播间状态变更
         private void Grab_OnControlMessage(object sender, WssBarrageGrab.RoomMessageEventArgs<ControlMessage> e)
         {
+            console.WriteLine($"直播间状态变更：{e.Message.Common.roomId} {e.Message.Status}", ConsoleColor.Yellow);
             var msg = e.Message;
             if (!CheckRoomId(msg.Common.roomId)) return;
             BarrageMsgPack pack = null;
@@ -452,13 +467,38 @@ namespace BarrageGrab
 
         private void Dieout_Elapsed(object sender, ElapsedEventArgs e)
         {
+            console.WriteLine($"Dieout_Elapsed", ConsoleColor.Green);
+
             var now = DateTime.Now;
             var dieoutKvs = socketList.Where(w => w.Value.LastPing.AddSeconds(dieout.Interval * 3) < now).ToList();
-            dieoutKvs.ForEach(f => f.Value.Socket.Close());
+            foreach (var kv in dieoutKvs)
+            {
+                try
+                {
+                    if (kv.Value == null || !kv.Value.Socket.IsAvailable) continue;
+                    kv.Value.Socket.Close();
+                }
+                catch (SocketException ex)
+                {
+                    Console.WriteLine($"Failed to close socket: {ex.Message}", ConsoleColor.Red);
+                    // Log the error details for further investigation
+                    Console.WriteLine($"SocketException ErrorCode: {ex.ErrorCode}");
+                    Console.WriteLine($"SocketException SocketErrorCode: {ex.SocketErrorCode}");
+                }
+                catch (Exception ex)
+                {
+                    // Catch any other types of exceptions
+                    Console.WriteLine($"An unexpected error occurred: {ex.Message}", ConsoleColor.Red);
+                }
+            }
+
+            //dieoutKvs.ForEach(f => f.Value.Socket.Close());
         }
 
         private void Listen(IWebSocketConnection socket)
         {
+            console.WriteLine($"Listen", ConsoleColor.Green);
+
             //客户端url
             string clientUrl = socket.ConnectionInfo.ClientIpAddress + ":" + socket.ConnectionInfo.ClientPort;
             if (!socketList.ContainsKey(clientUrl))
@@ -481,20 +521,24 @@ namespace BarrageGrab
 
                     if (cmdPack.Cmd == CommandCode.Close)
                     {
+                        console.WriteLine($"{DateTime.Now.ToLongTimeString()} 已经关闭与[{clientUrl}]的连接", ConsoleColor.Red);
                         this.Close();
                     }
                 }
-                catch (Exception) { }
+                catch (Exception) {
+                    console.WriteLine($"接收到无法解析的指令：{message}", ConsoleColor.Red);
+                }
             };
 
             socket.OnClose = () =>
             {
-                socketList.Remove(clientUrl);
                 console.WriteLine($"{DateTime.Now.ToLongTimeString()} 已经关闭与[{clientUrl}]的连接", ConsoleColor.Red);
+                socketList.Remove(clientUrl);
             };
 
             socket.OnPing = (data) =>
             {
+                console.WriteLine($"{DateTime.Now.ToLongTimeString()} 收到[{clientUrl}]的心跳包", ConsoleColor.Green);
                 socketList[clientUrl].LastPing = DateTime.Now;
                 socket.SendPong(Encoding.UTF8.GetBytes("pong"));
             };
@@ -506,6 +550,7 @@ namespace BarrageGrab
         /// <param name="msg"></param>
         public void Broadcast(BarrageMsgPack pack)
         {
+            console.WriteLine($"Broadcast", ConsoleColor.Green);
             if (pack == null) return;
             var offLines = new List<string>();
             foreach (var item in socketList)
@@ -540,6 +585,8 @@ namespace BarrageGrab
         /// </summary>
         public void Close()
         {
+            console.WriteLine($"Close", ConsoleColor.Green);
+
             socketList.Values.ToList().ForEach(f => f.Socket.Close());
             socketList.Clear();
             socketServer.Dispose();

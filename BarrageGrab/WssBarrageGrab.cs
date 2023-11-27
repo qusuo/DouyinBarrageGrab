@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using ProtoBuf;
 using ColorConsole;
 using BarrageGrab.Proxy;
@@ -78,6 +76,7 @@ namespace BarrageGrab
 
         public void Dispose()
         {
+            console.WriteLine("WssBarrageGrab: 正在停止代理...", ConsoleColor.Yellow);
             proxy.Dispose();
         }
 
@@ -85,6 +84,7 @@ namespace BarrageGrab
         //gzip解压缩
         private byte[] Decompress(byte[] zippedData)
         {
+            console.WriteLine("WssBarrageGrab: 正在解压缩...", ConsoleColor.Yellow);
             MemoryStream ms = new MemoryStream(zippedData);
             GZipStream compressedzipStream = new GZipStream(ms, CompressionMode.Decompress);
             MemoryStream outBuffer = new MemoryStream();
@@ -104,6 +104,7 @@ namespace BarrageGrab
         //ws数据处理
         private void Proxy_OnWebSocketData(object sender, WsMessageEventArgs e)
         {
+            console.WriteLine("WssBarrageGrab: " + e.HostName, ConsoleColor.Yellow);
             if (!appsetting.ProcessFilter.Contains(e.ProcessName)) return;
             var buff = e.Payload;
             if (buff.Length == 0) return;
@@ -130,24 +131,37 @@ namespace BarrageGrab
                 }
                 response.Messages.ForEach(f => DoMessage(f,e.ProcessName));
             }
-            catch (Exception) { }
+            catch (Exception ex)
+            {
+                console.WriteLine("WssBarrageGrab: " + ex.Message, ConsoleColor.Red);
+                return;
+            }
         }
 
         //http 数据处理
         private void Proxy_OnFetchResponse(object sender, HttpResponseEventArgs e)
         {
-            var payload = e.HttpClient.Response.Body;
-            var response = Serializer.Deserialize<Response>(new ReadOnlyMemory<byte>(payload));
+            try
+            {
+                console.WriteLine("WssBarrageGrab: " + e.HttpClient.Request.Url, ConsoleColor.Yellow);
+                var payload = e.HttpClient.Response.Body;
+                var response = Serializer.Deserialize<Response>(new ReadOnlyMemory<byte>(payload));
 
-            if (!succPackHostNames.Contains(e.HostName))
-            {
-                succPackHostNames.Add(e.HostName);
-                SaveHostNameCache();
+                if (!succPackHostNames.Contains(e.HostName))
+                {
+                    succPackHostNames.Add(e.HostName);
+                    SaveHostNameCache();
+                }
+                response.Messages.ForEach(f =>
+                {
+                    DoMessage(f, e.ProcessName);
+                });
             }
-            response.Messages.ForEach(f =>
+            catch (Exception ex)
             {
-                DoMessage(f,e.ProcessName);
-            });
+                console.WriteLine("WssBarrageGrab: " + ex.Message, ConsoleColor.Red);
+                return;
+            }
         }
 
         //用于缓存接收过的消息ID，判断是否重复接收
@@ -156,6 +170,7 @@ namespace BarrageGrab
         //发送事件
         private void DoMessage(Message msg,string processName)
         {
+            console.WriteLine("WssBarrageGrab: " + msg.Method, ConsoleColor.Yellow);
             List<long> msgIdList;
             if (msgDic.ContainsKey(msg.Method))
             {
@@ -284,6 +299,7 @@ namespace BarrageGrab
         //将成功解包的域名缓存到文件
         private void SaveHostNameCache()
         {
+            console.WriteLine("WssBarrageGrab: 正在写入成功解包域名缓存...", ConsoleColor.Yellow);
             //获取程序运行目录
             var baseDir = Directory.GetCurrentDirectory();
             var fullPath = Path.Combine(baseDir, "成功解包域名缓存.txt");
@@ -331,6 +347,7 @@ namespace BarrageGrab
 
             public RoomMessageEventArgs(string process, T data)
             {
+                Console.WriteLine("WssBarrageGrab: " + process, ConsoleColor.Yellow);
                 this.Process = process;
                 this.Message = data;
             }
