@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Reflection;
-using System.Collections.Generic;
 using BarrageGrab.Proxy.ProxyEventArgs;
 
 namespace BarrageGrab.Proxy

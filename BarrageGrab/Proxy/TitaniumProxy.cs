@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Net;
 using System.Net.Security;
 using System.Text.RegularExpressions;
@@ -9,7 +8,6 @@ using System.Threading.Tasks;
 using BarrageGrab.Modles;
 using BarrageGrab.Proxy.ProxyEventArgs;
 using ColorConsole;
-using Org.BouncyCastle.Ocsp;
 using Titanium.Web.Proxy;
 using Titanium.Web.Proxy.EventArguments;
 using Titanium.Web.Proxy.Http;
@@ -33,6 +31,7 @@ namespace BarrageGrab.Proxy
 
         public TitaniumProxy()
         {
+            console.WriteLine("正在初始化代理...", ConsoleColor.Green);
             //注册系统代理
             //RegisterSystemProxy();
             proxyServer = new ProxyServer();
@@ -75,6 +74,7 @@ namespace BarrageGrab.Proxy
 
         private async Task ProxyServer_BeforeResponse(object sender, SessionEventArgs e)
         {
+            console.WriteLine($"正在处理响应 {e.HttpClient.Request.RequestUri}...", ConsoleColor.Green);
             string uri = e.HttpClient.Request.RequestUri.ToString();
             string hostname = e.HttpClient.Request.RequestUri.Host;
             var processid = e.HttpClient.ProcessId.Value;
@@ -93,6 +93,7 @@ namespace BarrageGrab.Proxy
 
         private async Task HookBarrage(SessionEventArgs e)
         {
+            console.WriteLine($"正在处理弹幕 {e.HttpClient.Request.RequestUri}...", ConsoleColor.Green);
             string uri = e.HttpClient.Request.RequestUri.ToString();
             string hostname = e.HttpClient.Request.RequestUri.Host;
             var processid = e.HttpClient.ProcessId.Value;
@@ -128,6 +129,7 @@ namespace BarrageGrab.Proxy
         /// <returns></returns>
         private string GetInjectScript(string name)
         {
+            console.WriteLine($"正在获取注入脚本 {name}...", ConsoleColor.Green);
             //获取exe所在目录路径            
             var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Scripts", "inject", name + ".js");
             if (File.Exists(path))
@@ -139,6 +141,7 @@ namespace BarrageGrab.Proxy
 
         private async Task HookPageAsync(SessionEventArgs e)
         {
+            console.WriteLine($"正在处理页面 {e.HttpClient.Request.RequestUri}...", ConsoleColor.Green);
             string uri = e.HttpClient.Request.RequestUri.ToString();
             string hostname = e.HttpClient.Request.RequestUri.Host;
             string url = e.HttpClient.Request.Url;
@@ -228,6 +231,7 @@ namespace BarrageGrab.Proxy
 
         private async Task HookScriptAsync(SessionEventArgs e)
         {
+            console.WriteLine($"正在检测是否为JS页面 {e.HttpClient.Request.RequestUri.Host}...", ConsoleColor.Green);
             string uri = e.HttpClient.Request.RequestUri.ToString();
             string hostname = e.HttpClient.Request.RequestUri.Host;
             string url = e.HttpClient.Request.Url;
@@ -264,6 +268,7 @@ namespace BarrageGrab.Proxy
 
         private Task ProxyServer_ServerCertificateValidationCallback(object sender, CertificateValidationEventArgs e)
         {
+            Console.WriteLine($"正在验证证书 {e.SslPolicyErrors}...", ConsoleColor.Green);
             // set IsValid to true/false based on Certificate Errors
             if (e.SslPolicyErrors == SslPolicyErrors.None)
             {
@@ -272,40 +277,57 @@ namespace BarrageGrab.Proxy
             return Task.CompletedTask;
         }
 
+#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         private async Task ExplicitEndPoint_BeforeTunnelConnectRequest(object sender, TunnelConnectSessionEventArgs e)
+#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
+            console.WriteLine($"正在连接 {e.HttpClient.Request.RequestUri.Host}...", ConsoleColor.Green);
+
             string url = e.HttpClient.Request.RequestUri.ToString();
             string hostname = e.HttpClient.Request.RequestUri.Host;
 
+            console.WriteLine($"正在连接 {e.HttpClient.Request.RequestUri.Host}... start", ConsoleColor.Green);
             //用于检测修改js脚本
             if (hostname == SCRIPT_HOST)
             {
+                console.WriteLine($"正在连接 {e.HttpClient.Request.RequestUri.Host}... 0", ConsoleColor.Green);
                 e.DecryptSsl = true;
                 return;
             }
 
+            console.WriteLine($"正在连接 {e.HttpClient.Request.RequestUri.Host}... 1", ConsoleColor.Green);
             //用于采集当前用户信息数据，供本地调用
             if (hostname == LIVE_HOST)
             {
+                console.WriteLine($"正在连接 {e.HttpClient.Request.RequestUri.Host}... 1.1", ConsoleColor.Green);
                 e.DecryptSsl = true;
                 return;
             }
 
+            console.WriteLine($"正在连接 {e.HttpClient.Request.RequestUri.Host}... 2", ConsoleColor.Green);
             if (!CheckHost(hostname))
             {
+                console.WriteLine($"正在连接 {e.HttpClient.Request.RequestUri.Host}... 3", ConsoleColor.Green);
                 e.DecryptSsl = false;
             }
         }
 
         protected override bool CheckHost(string host)
         {
+            console.WriteLine($"正在检测域名 {host}...", ConsoleColor.Green);
             host = host.Trim().ToLower();
             var succ = base.CheckHost(host);
+
+            console.WriteLine($"正在检测域名 {host}... {succ}...{succ || host == SCRIPT_HOST || host == LIVE_HOST}", ConsoleColor.Green);
             return succ || host == SCRIPT_HOST || host == LIVE_HOST;
         }
 
+#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         private async void WebSocket_DataReceived(object sender, DataEventArgs e)
+#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
+            console.WriteLine("收到WebSocket数据包", ConsoleColor.Green);
+
             var args = (SessionEventArgs)sender;
 
             string hostname = args.HttpClient.Request.RequestUri.Host;
@@ -358,6 +380,7 @@ namespace BarrageGrab.Proxy
                 // 没有收到 WebSocket 帧的结束帧，抛出异常或者进行处理
             }
 
+            console.WriteLine("收到WebSocket数据包 end", ConsoleColor.Green);
         }
 
         /// <summary>
@@ -365,6 +388,8 @@ namespace BarrageGrab.Proxy
         /// </summary>
         override public void Dispose()
         {
+            console.WriteLine("正在释放资源...", ConsoleColor.Green);
+
             proxyServer.Stop();
             proxyServer.Dispose();
             if (Appsetting.Current.UsedProxy)
@@ -378,6 +403,7 @@ namespace BarrageGrab.Proxy
         /// </summary>
         override public void Start()
         {
+            console.WriteLine("正在启动代理...", ConsoleColor.Green);
             proxyServer.Start(Appsetting.Current.UsedProxy);
             if (Appsetting.Current.UsedProxy)
             {

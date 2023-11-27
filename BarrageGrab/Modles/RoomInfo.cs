@@ -537,6 +537,7 @@ namespace BarrageGrab.Modles
             }
             catch (Exception ex)
             {
+                Logger.LogError(ex, "在通过正则匹配直播页房间信息时失败，可能是官方做了升级");
                 return (2, "匹配到的房间数据格式有错误");
             }
             //var root = jsonObject["children"][3];
