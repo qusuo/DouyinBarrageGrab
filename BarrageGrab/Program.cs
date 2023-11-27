@@ -1,16 +1,18 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Sockets;
-using System.Net;
 using System.Runtime.InteropServices;
-using System.Text;
 using System.Threading;
 
 namespace BarrageGrab
 {
     public class Program
     {
+        // Import necessary functions from user32.dll
+        //[DllImport("user32.dll")]
+        //private static extern bool SetConsoleCtrlHandler(ConsoleCtrlDelegate handler, bool add);
+
+        //// Delegate type to be used as the handler routine for SetConsoleCtrlHandler
+        //private delegate bool ConsoleCtrlDelegate(int ctrlType);
+
         static void Main(string[] args)
         {            
             if (CheckAlreadyRunning())
@@ -20,28 +22,54 @@ namespace BarrageGrab
                 return;
             }
 
-            WinApi.SetConsoleCtrlHandler(cancelHandler, true);//捕获控制台关闭
-            WinApi.DisableQuickEditMode();//禁用控制台快速编辑模式            
-            Console.Title = "抖音弹幕监听推送";
- 
-            bool exited = false;
-            AppRuntime.WssService.StartListen();
-            AppRuntime.WssService.OnClose += (s, e) =>
+            try
             {
-                //退出程序
-                exited = true;
-            };
+                // Set the console control handler to handle Ctrl+C and close events
+                SetConsoleCtrlHandler(ConsoleCtrlHandler, true);
 
-            while (!exited)
+                WinApi.DisableQuickEditMode();//禁用控制台快速编辑模式            
+                Console.Title = "抖音弹幕监听推送";
+
+                bool exited = false;
+                AppRuntime.WssService.StartListen();
+                AppRuntime.WssService.OnClose += (s, e) =>
+                {
+                    //退出程序
+                    exited = true;
+                };
+
+                while (!exited)
+                {
+                    Thread.Sleep(50);
+                }
+            }
+            catch (Exception ex)
             {
-                Thread.Sleep(500);
+                Console.WriteLine(ex.Message);
             }
 
             Console.WriteLine("服务器已关闭...");
-            
+
             //退出程序,不显示 按任意键退出
             Environment.Exit(0);
         }
+
+        // Handler function for Ctrl+C and close events
+        private static bool ConsoleCtrlHandler(int ctrlType)
+        {
+            Console.WriteLine("Closing the application...");
+
+            AppRuntime.WssService.Close();
+            // Additional cleanup or finalization code can be added here
+
+            //Thread.Sleep(1000); // Simulating some cleanup process
+
+            Console.WriteLine("End of the application.");
+
+            // Return false to continue normal termination process
+            return false;
+        }
+
 
         private static WinApi.ControlCtrlDelegate cancelHandler = new WinApi.ControlCtrlDelegate((CtrlType) =>
         {
@@ -69,5 +97,12 @@ namespace BarrageGrab
                 return !createdNew;
             }
         }
+
+        // Import necessary functions from kernel32.dll
+        [DllImport("kernel32.dll")]
+        private static extern bool SetConsoleCtrlHandler(ConsoleCtrlDelegate handler, bool add);
+
+        // Delegate type to be used as the handler routine for SetConsoleCtrlHandler
+        private delegate bool ConsoleCtrlDelegate(int ctrlType);
     }
 }
